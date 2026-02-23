@@ -17,12 +17,17 @@
         .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #a85d1a; }
         .hidden { display: none !important; }
         .remember-me { font-size: 11px; margin-top: 5px; cursor: pointer; display: flex; align-items: center; justify-content: flex-end; }
-        #gameScore { position: fixed; top: 10%; left: 50%; transform: translateX(-50%); font-size: 70px; color: white; text-shadow: 4px 4px 0 #000; z-index: 200; pointer-events: none; }
+        #gameScoreContainer { position: fixed; top: 8%; left: 50%; transform: translateX(-50%); text-align: center; z-index: 200; pointer-events: none; }
+        #gameScore { font-size: 70px; color: white; text-shadow: 4px 4px 0 #000; line-height: 1; }
+        #gameBestScore { font-size: 20px; color: #F7FD2B; text-shadow: 2px 2px 0 #000; }
         .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ff4444; margin-right: 5px; border: 1px solid #fff; }
         .status-online { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
         .selection-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 15px; background: rgba(0,0,0,0.4); border-radius: 15px; }
         .item-box { padding: 10px; border-radius: 10px; border: 3px solid transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); font-size: 24px; }
         .item-box.selected { border-color: #F7FD2B; background: rgba(247, 253, 43, 0.2); }
+        .music-ctrl { position: fixed; bottom: 20px; left: 20px; z-index: 300; min-width: 50px; background: #34495e; }
+        #newRecordMsg { color: #F7FD2B; font-size: 24px; text-shadow: 2px 2px 0 #000; margin-bottom: 10px; animation: bounce 0.5s infinite alternate; }
+        @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.1); } }
     </style>
 </head>
 <body onload="checkAutoLogin()" onclick="enableMusic()">
@@ -47,8 +52,13 @@
     <div class="coins-display">OR: <span id="coinsDisp">0</span> 🪙</div>
 </div>
 
-<div id="gameScore" class="hidden">0</div>
+<div id="gameScoreContainer" class="hidden">
+    <div id="gameScore">0</div>
+    <div id="gameBestScore">RECORD: 0</div>
+</div>
+
 <button id="autoClickBtn" class="btn hidden" style="position:fixed; bottom:20px; right:20px; z-index:300;" onclick="activateAutoClick()">IA AUTO (10🪙) [Z]</button>
+<button id="musicBtn" class="btn music-ctrl" onclick="toggleMusic()">🔊</button>
 
 <div id="mainMenu" class="overlay">
     <h1 class="game-title">FLAPPY<br>WORLDS</h1>
@@ -61,7 +71,15 @@
 
 <div id="skinMenu" class="overlay hidden"><h2>COULEUR</h2><div id="skinGrid" class="selection-grid"></div><button class="btn" style="background:#888; margin-top:15px;" onclick="openMenu('mainMenu')">RETOUR</button></div>
 <div id="hatMenu" class="overlay hidden"><h2>CHAPEAU</h2><div id="hatGrid" class="selection-grid"></div><button class="btn" style="background:#888; margin-top:15px;" onclick="openMenu('mainMenu')">RETOUR</button></div>
-<div id="gameOverMenu" class="overlay hidden"><h1 style="color:#ff4444;">GAME OVER</h1><p style="font-size:22px;">SCORE: <span id="finalScore">0</span></p><button class="btn" style="background:#55AA22;" onclick="startGame()">REJOUER</button><button class="btn" onclick="openMenu('mainMenu')">MENU</button></div>
+
+<div id="gameOverMenu" class="overlay hidden">
+    <h1 style="color:#ff4444;">GAME OVER</h1>
+    <div id="newRecordMsg" class="hidden">✨ NOUVEAU RECORD ! ✨</div>
+    <p style="font-size:22px;">SCORE: <span id="finalScore">0</span></p>
+    <button class="btn" style="background:#55AA22;" onclick="startGame()">REJOUER</button>
+    <button class="btn" onclick="openMenu('mainMenu')">MENU</button>
+</div>
+
 <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -73,8 +91,14 @@ let clouds = [];
 const skinColors = ["#f7d300","#ff4444","#44ff44","#44aaff","#9b59b6","#e67e22","#ff9ff3","#1dd1a1","#ffffff","#000000"];
 const hatEmojis = ["", "🎩", "👑", "🏓", "🎓", "🧢", "📬", "🎀", "🌵", "🍕"];
 const music = document.getElementById("bgMusic");
+let isMusicMuted = false;
 
-function enableMusic() { music.play().catch(() => {}); }
+function enableMusic() { if(!isMusicMuted) music.play().catch(() => {}); }
+function toggleMusic() {
+    isMusicMuted = !isMusicMuted;
+    if(isMusicMuted) music.pause(); else music.play();
+    document.getElementById('musicBtn').innerText = isMusicMuted ? "🔇" : "🔊";
+}
 
 async function checkAutoLogin() {
     const savedPseudo = localStorage.getItem('flappy_pseudo');
@@ -196,14 +220,10 @@ function update() {
         
         pipes.forEach(p => {
             ctx.fillStyle = "#73bf2e"; ctx.strokeStyle = "black"; ctx.lineWidth = 3;
-            ctx.fillRect(p.x, 0, 80, p.top);
-            ctx.strokeRect(p.x, -5, 80, p.top+5);
-            ctx.fillRect(p.x-5, p.top-25, 90, 25);
-            ctx.strokeRect(p.x-5, p.top-25, 90, 25);
-            ctx.fillRect(p.x, p.bottom, 80, canvas.height);
-            ctx.strokeRect(p.x, p.bottom, 80, canvas.height);
-            ctx.fillRect(p.x-5, p.bottom, 90, 25);
-            ctx.strokeRect(p.x-5, p.bottom, 90, 25);
+            ctx.fillRect(p.x, 0, 80, p.top); ctx.strokeRect(p.x, -5, 80, p.top+5);
+            ctx.fillRect(p.x-5, p.top-25, 90, 25); ctx.strokeRect(p.x-5, p.top-25, 90, 25);
+            ctx.fillRect(p.x, p.bottom, 80, canvas.height); ctx.strokeRect(p.x, p.bottom, 80, canvas.height);
+            ctx.fillRect(p.x-5, p.bottom, 90, 25); ctx.strokeRect(p.x-5, p.bottom, 90, 25);
         });
         gameCoins.forEach(c => { if(!c.collected) { ctx.fillStyle = "#F7FD2B"; ctx.beginPath(); ctx.arc(c.x, c.y, 12, 0, 7); ctx.fill(); ctx.stroke(); } });
     }
@@ -215,7 +235,15 @@ function update() {
     });
 
     if(bird.alive || (gameActive && particles.length > 0)) {
+        let displayName = (userData.pseudo === "Joueur" || !userData.password) ? "Anonyme" : userData.pseudo;
+        ctx.save();
+        ctx.font = "bold 18px Arial"; ctx.textAlign = "center"; ctx.lineWidth = 4; ctx.strokeStyle = "black";
+        ctx.strokeText(displayName, bird.x, bird.y - 50);
+        ctx.fillStyle = "white"; ctx.fillText(displayName, bird.x, bird.y - 50);
+        ctx.restore();
+
         ctx.save(); ctx.translate(bird.x, bird.y); ctx.rotate(bird.angle);
+        if(userData.hat) { ctx.font = "24px Arial"; ctx.textAlign = "center"; ctx.fillText(userData.hat, 0, -18); }
         ctx.fillStyle = userData.skin; ctx.strokeStyle = "black"; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.ellipse(0, 0, 20, 17, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
         let w = Math.sin(frame * 0.4) * 8;
@@ -223,7 +251,6 @@ function update() {
         ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(10, -6, 7, 0, 7); ctx.fill(); ctx.stroke();
         ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(12, -6, 2.5, 0, 7); ctx.fill();
         ctx.fillStyle = "#f75d15"; ctx.beginPath(); ctx.ellipse(18, 2, 10, 6, 0, 0, 7); ctx.fill(); ctx.stroke();
-        if(userData.hat) { ctx.font = "24px Arial"; ctx.textAlign = "center"; ctx.fillText(userData.hat, 0, -18); }
         ctx.restore();
     }
     ctx.fillStyle = "#ded895"; ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
@@ -234,6 +261,7 @@ function update() {
 function updateUI() {
     document.getElementById('highScoreDisp').innerText = userData.highScore;
     document.getElementById('coinsDisp').innerText = userData.coins;
+    document.getElementById('gameBestScore').innerText = "RECORD: " + userData.highScore;
     const sGrid = document.getElementById('skinGrid'); sGrid.innerHTML = "";
     skinColors.forEach(c => {
         const div = document.createElement('div');
@@ -253,22 +281,34 @@ function updateUI() {
 function startGame() {
     bird = { x: 100, y: canvas.height/2, v: 0, angle: 0, alive: true };
     pipes = []; gameCoins = []; particles = []; score = 0; frame = 0; gameActive = true;
-    
-    // CORRECTION : On force l'affichage du score à 0 au démarrage
     document.getElementById('gameScore').innerText = "0";
-    
+    document.getElementById('gameBestScore').innerText = "RECORD: " + userData.highScore;
+    document.getElementById('newRecordMsg').classList.add('hidden');
     openMenu('none');
     document.getElementById('uiToHide').classList.add('hidden');
-    document.getElementById('gameScore').classList.remove('hidden');
+    document.getElementById('gameScoreContainer').classList.remove('hidden');
     document.getElementById('autoClickBtn').classList.remove('hidden');
 }
 
 function endGame() {
-    gameActive = false; if(score > userData.highScore) userData.highScore = score;
-    saveToCloud(); document.getElementById('uiToHide').classList.remove('hidden');
-    document.getElementById('gameScore').classList.add('hidden');
+    gameActive = false; 
+    let isNewRecord = false;
+    if(score > userData.highScore) {
+        userData.highScore = score;
+        isNewRecord = true;
+    }
+    saveToCloud(); 
+    document.getElementById('uiToHide').classList.remove('hidden');
+    document.getElementById('gameScoreContainer').classList.add('hidden');
     document.getElementById('autoClickBtn').classList.add('hidden');
-    document.getElementById('finalScore').innerText = score; openMenu('gameOverMenu');
+    document.getElementById('finalScore').innerText = score;
+    
+    if(isNewRecord && score > 0) {
+        document.getElementById('newRecordMsg').classList.remove('hidden');
+    }
+    
+    openMenu('gameOverMenu');
+    updateUI();
 }
 
 function openMenu(id) {
