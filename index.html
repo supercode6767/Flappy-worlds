@@ -3,17 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Flappy Worlds - Cloud Sync</title>
+    <title>Flappy Worlds - Bird Leaderboard</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #70c5ce; font-family: 'Arial Black', sans-serif; touch-action: manipulation; }
-        canvas { display: block; width: 100vw; height: 100vh; }
+        /* CORRECTIF ABSOLU : Enlève la latence de 300ms sur TOUS les clics */
+        * { touch-action: manipulation !important; }
+
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #70c5ce; 
+            font-family: 'Arial Black', sans-serif; 
+            /* Empêche la sélection de texte lors du spam-clic */
+            user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none;
+        }
+        #gameCanvas { 
+            display: block; width: 100vw; height: 100vh; cursor: pointer; 
+            /* Supprime le flash bleu au clic sur mobile et force l'arrêt des gestes */
+            -webkit-tap-highlight-color: transparent; 
+            touch-action: none !important;
+        }
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); z-index: 100; color: white; text-align: center; }
         .game-title { font-size: 50px; color: #F7FD2B; text-shadow: 4px 4px 0 #e67e22, 6px 6px 0 #000; margin-bottom: 30px; text-transform: uppercase; line-height: 0.9; }
         .top-right-bar { position: fixed; top: 15px; right: 20px; text-align: right; z-index: 200; color: white; }
         .pseudo-input { background: rgba(0,0,0,0.5); border: 1px solid #fff; color: #F7FD2B; font-family: inherit; font-size: 14px; padding: 5px; border-radius: 5px; text-align: right; width: 130px; margin-bottom: 5px; }
         .high-score { font-size: 18px; text-shadow: 2px 2px 0 #000; pointer-events: none; }
-        .coins-display { font-size: 22px; color: #F7FD2B; text-shadow: 2px 2px 0 #000; font-weight: bold; z-index: 250; }
-        .btn { background: #e67e22; border: 3px solid #fff; color: white; padding: 10px 15px; font-size: 14px; cursor: pointer; border-radius: 10px; min-width: 150px; box-shadow: 0 5px 0 #a85d1a; font-family: inherit; margin: 5px; transition: 0.1s; }
+        .coins-display { font-size: 22px; color: #F7FD2B; text-shadow: 2px 2px 0 #000; font-weight: bold; z-index: 250; pointer-events: none; }
+        .btn { background: #e67e22; border: 3px solid #fff; color: white; padding: 10px 15px; font-size: 14px; cursor: pointer; border-radius: 10px; min-width: 150px; box-shadow: 0 5px 0 #a85d1a; font-family: inherit; margin: 5px; transition: 0.1s; position: relative; z-index: 301; }
         .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #a85d1a; }
         .hidden { display: none !important; }
         .remember-me { font-size: 11px; margin-top: 5px; cursor: pointer; display: flex; align-items: center; justify-content: flex-end; }
@@ -26,11 +39,20 @@
         .item-box { padding: 10px; border-radius: 10px; border: 3px solid transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); font-size: 24px; }
         .item-box.selected { border-color: #F7FD2B; background: rgba(247, 253, 43, 0.2); }
         .music-ctrl { position: fixed; bottom: 20px; left: 20px; z-index: 300; min-width: 50px; background: #34495e; }
-        #newRecordMsg { color: #F7FD2B; font-size: 24px; text-shadow: 2px 2px 0 #000; margin-bottom: 10px; animation: bounce 0.5s infinite alternate; }
-        @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.1); } }
+        
+        /* Styles Leaderboard */
+        .leaderboard-container { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 20px; border: 3px solid #F7FD2B; min-width: 320px; margin-top: 10px; }
+        .lb-table { width: 100%; border-collapse: collapse; font-size: 16px; }
+        .lb-table th { border-bottom: 2px solid #F7FD2B; color: #F7FD2B; padding: 8px; font-size: 12px; }
+        .lb-table td { padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); vertical-align: middle; }
+        .my-score-row { background: rgba(247, 253, 43, 0.2); }
+        .lb-bird-canvas { vertical-align: middle; }
+
+        .account-actions { margin-top: 8px; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+        .btn-small { min-width: 80px; padding: 4px 8px; font-size: 10px; margin: 0; box-shadow: 0 3px 0 #666; }
     </style>
 </head>
-<body onload="checkAutoLogin()" onclick="enableMusic()">
+<body onload="checkAutoLogin()">
 
 <audio id="bgMusic" loop preload="auto"><source src="Pixel_Pulse_FULL_SONG_MusicGPT.mp3" type="audio/mpeg"></audio>
 
@@ -42,14 +64,22 @@
             <input type="password" id="passBox" class="pseudo-input" maxlength="12" placeholder="Pass">
             <label class="remember-me">Rester connecté <input type="checkbox" id="rememberBox" style="margin-left:5px;"></label>
             <div style="margin-top: 5px;">
-                <button class="btn" style="min-width:70px; padding:5px; font-size:10px; background:#3498db;" onclick="register()">S'INSCRIRE</button>
-                <button class="btn" style="min-width:70px; padding:5px; font-size:10px; background:#2ecc71;" onclick="login()">CONNEXION</button>
+                <button class="btn" style="min-width:70px; padding:5px; font-size:10px; background:#3498db;" onclick="register(event)">S'INSCRIRE</button>
+                <button class="btn" style="min-width:70px; padding:5px; font-size:10px; background:#2ecc71;" onclick="login(event)">CONNEXION</button>
             </div>
         </div>
-        <button id="logoutBtn" class="btn hidden" style="background:#c0392b; min-width:100px; padding:5px; font-size:10px; margin-bottom: 10px;" onclick="logout()">DÉCONNEXION</button>
+        <div id="loggedInActions" class="hidden">
+            <button id="logoutBtn" class="btn" style="background:#c0392b; min-width:100px; padding:5px; font-size:10px; margin-bottom: 5px;" onclick="logout(event)">DÉCONNEXION</button>
+        </div>
+        
         <div class="high-score">RECORD: <span id="highScoreDisp">0</span></div>
+        <div class="coins-display">OR: <span id="coinsDisp">0</span> 🪙</div>
+        
+        <div id="accountManager" class="account-actions hidden">
+            <button class="btn btn-small" style="background:#f1c40f;" onclick="renameAccount(event)">RENOMMER</button>
+            <button class="btn btn-small" style="background:#e74c3c;" onclick="deleteAccount(event)">SUPPRIMER</button>
+        </div>
     </div>
-    <div class="coins-display">OR: <span id="coinsDisp">0</span> 🪙</div>
 </div>
 
 <div id="gameScoreContainer" class="hidden">
@@ -57,32 +87,55 @@
     <div id="gameBestScore">RECORD: 0</div>
 </div>
 
-<button id="autoClickBtn" class="btn hidden" style="position:fixed; bottom:20px; right:20px; z-index:300;" onclick="activateAutoClick()">IA AUTO (10🪙) [Z]</button>
-<button id="musicBtn" class="btn music-ctrl" onclick="toggleMusic()">🔊</button>
+<button id="autoClickBtn" class="btn hidden" style="position:fixed; bottom:20px; right:20px; z-index:300;" onclick="activateAutoClick(event)">IA AUTO (10🪙) [Z]</button>
+<button id="musicBtn" class="btn music-ctrl" onclick="toggleMusic(event)">🔊</button>
 
 <div id="mainMenu" class="overlay">
     <h1 class="game-title">FLAPPY<br>WORLDS</h1>
     <div class="menu-group">
-        <button class="btn" style="background:#55AA22;" onclick="startGame()">JOUER</button><br>
-        <button class="btn" onclick="openMenu('skinMenu')">OISEAU</button><br>
-        <button class="btn" style="background:#44aaff;" onclick="openMenu('hatMenu')">CHAPEAU</button>
+        <button class="btn" style="background:#55AA22;" onclick="startGame(event)">JOUER</button><br>
+        <button class="btn" onclick="openMenu('skinMenu', event)">OISEAU</button><br>
+        <button class="btn" style="background:#44aaff;" onclick="openMenu('hatMenu', event)">CHAPEAU</button><br>
+        <button class="btn" style="background:#9b59b6;" onclick="showLeaderboard(event)">CLASSEMENT</button>
     </div>
 </div>
 
-<div id="skinMenu" class="overlay hidden"><h2>COULEUR</h2><div id="skinGrid" class="selection-grid"></div><button class="btn" style="background:#888; margin-top:15px;" onclick="openMenu('mainMenu')">RETOUR</button></div>
-<div id="hatMenu" class="overlay hidden"><h2>CHAPEAU</h2><div id="hatGrid" class="selection-grid"></div><button class="btn" style="background:#888; margin-top:15px;" onclick="openMenu('mainMenu')">RETOUR</button></div>
+<div id="leaderboardMenu" class="overlay hidden">
+    <h2 style="color:#F7FD2B">TOP 5 MONDIAL</h2>
+    <div class="leaderboard-container">
+        <div id="leaderboardList">Chargement...</div>
+    </div>
+    <button class="btn" style="background:#888; margin-top:20px;" onclick="openMenu('mainMenu', event)">RETOUR</button>
+</div>
 
+<div id="skinMenu" class="overlay hidden"><h2>COULEUR</h2><div id="skinGrid" class="selection-grid"></div><button class="btn" style="background:#888; margin-top:15px;" onclick="openMenu('mainMenu', event)">RETOUR</button></div>
+<div id="hatMenu" class="overlay hidden"><h2>CHAPEAU</h2><div id="hatGrid" class="selection-grid"></div><button class="btn" style="background:#888; margin-top:15px;" onclick="openMenu('mainMenu', event)">RETOUR</button></div>
 <div id="gameOverMenu" class="overlay hidden">
     <h1 style="color:#ff4444;">GAME OVER</h1>
     <div id="newRecordMsg" class="hidden">✨ NOUVEAU RECORD ! ✨</div>
     <p style="font-size:22px;">SCORE: <span id="finalScore">0</span></p>
-    <button class="btn" style="background:#55AA22;" onclick="startGame()">REJOUER</button>
-    <button class="btn" onclick="openMenu('mainMenu')">MENU</button>
+    <button class="btn" style="background:#55AA22;" onclick="startGame(event)">REJOUER</button>
+    <button class="btn" onclick="openMenu('mainMenu', event)">MENU</button>
 </div>
 
 <canvas id="gameCanvas"></canvas>
 
 <script>
+// --- ANTI DOUBLE CLIC / ZOOM IOS BRUTAL ---
+document.addEventListener('touchstart', function(event) {
+    if (event.touches.length > 1) { event.preventDefault(); } // Empêche le zoom avec 2 doigts
+}, { passive: false });
+
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function(event) {
+    let now = (new Date()).getTime();
+    if (now - lastTouchEnd <= 300) {
+        event.preventDefault(); // Empêche le double-tap to zoom
+    }
+    lastTouchEnd = now;
+}, { passive: false });
+// ------------------------------------------
+
 const UPSTASH_URL = "https://adequate-vulture-7895.upstash.io";
 const UPSTASH_TOKEN = "AR7XAAImcDEzNDliNDI3NDRiZjM0OTY4YjJiYjcxNTVmY2RkOTBmZnAxNzg5NQ";
 
@@ -91,22 +144,107 @@ let clouds = [];
 const skinColors = ["#f7d300","#ff4444","#44ff44","#44aaff","#9b59b6","#e67e22","#ff9ff3","#1dd1a1","#ffffff","#000000"];
 const hatEmojis = ["", "🎩", "👑", "🏓", "🎓", "🧢", "📬", "🎀", "🌵", "🍕"];
 const music = document.getElementById("bgMusic");
-let isMusicMuted = false;
+let isMusicMuted = false, aiInterval = null, lastJumpTime = 0, isTouch = false;
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+let bird = { x: 100, y: 300, v: 0, angle: 0, alive: false };
+let pipes = [], gameCoins = [], particles = [], frame = 0, gameActive = false, score = 0, aiActive = false;
+
+function drawFullBird(c, x, y, angle, data, scale = 1, showLabel = false) {
+    c.save();
+    c.translate(x, y);
+    c.scale(scale, scale);
+    if(showLabel) {
+        let name = (data.pseudo === "Joueur" || !data.password) ? "Anonyme" : data.pseudo;
+        c.font = "bold 14px Arial";
+        let tw = c.measureText(name).width;
+        c.fillStyle = "rgba(0,0,0,0.7)";
+        c.beginPath(); if(c.roundRect) c.roundRect(-tw/2 - 8, -55, tw + 16, 22, 8); else c.rect(-tw/2 - 8, -55, tw + 16, 22);
+        c.fill(); c.fillStyle = "white"; c.textAlign = "center"; c.fillText(name, 0, -39);
+    }
+    c.rotate(angle);
+    if(data.hat) { c.font = "24px Arial"; c.textAlign = "center"; c.fillText(data.hat, 0, -18); }
+    c.fillStyle = data.skin; c.strokeStyle = "black"; c.lineWidth = 2;
+    c.beginPath(); c.ellipse(0, 0, 20, 17, 0, 0, Math.PI*2); c.fill(); c.stroke();
+    let w = Math.sin(Date.now() * 0.01) * 5; 
+    c.fillStyle = "white"; c.beginPath(); c.ellipse(-8, w, 11, 7, 0, 0, Math.PI*2); c.fill(); c.stroke();
+    c.fillStyle = "white"; c.beginPath(); c.arc(10, -6, 7, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = "black"; c.beginPath(); c.arc(12, -6, 2.5, 0, 7); c.fill();
+    c.fillStyle = "#f75d15"; c.beginPath(); c.ellipse(18, 2, 10, 6, 0, 0, 7); c.fill(); c.stroke();
+    c.restore();
+}
+
+async function showLeaderboard(e) {
+    if(e) e.stopPropagation();
+    openMenu('leaderboardMenu');
+    const listDiv = document.getElementById('leaderboardList');
+    listDiv.innerHTML = "Recherche des champions...";
+
+    try {
+        const resKeys = await fetch(`${UPSTASH_URL}/keys/*`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+        const keys = await resKeys.json();
+        if (!keys.result || keys.result.length === 0) { listDiv.innerHTML = "Aucun joueur enregistré."; return; }
+
+        const allData = await Promise.all(keys.result.map(async (key) => {
+            const r = await fetch(`${UPSTASH_URL}/get/${key}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+            const d = await r.json();
+            return JSON.parse(d.result);
+        }));
+
+        allData.sort((a, b) => b.highScore - a.highScore);
+        const topPlayers = allData.slice(0, 5);
+
+        let html = '<table class="lb-table"><tr><th>#</th><th>OISEAU</th><th>JOUEUR</th><th>SCORE</th></tr>';
+        topPlayers.forEach((p, i) => {
+            const medals = ["🥇", "🥈", "🥉", "4", "5"];
+            html += `<tr class="${p.pseudo === userData.pseudo ? 'my-score-row' : ''}">
+                <td style="width:30px; text-align:center;">${medals[i]}</td>
+                <td style="width:60px; text-align:center;"><canvas id="lbBird_${i}" width="50" height="50" class="lb-bird-canvas"></canvas></td>
+                <td style="text-align:left; padding-left:10px;">${p.pseudo}</td>
+                <td style="color:#F7FD2B; font-weight:bold;">${p.highScore}</td>
+            </tr>`;
+        });
+        listDiv.innerHTML = html + '</table>';
+
+        topPlayers.forEach((p, i) => {
+            const lbCanvas = document.getElementById(`lbBird_${i}`);
+            if (lbCanvas) drawFullBird(lbCanvas.getContext('2d'), 25, 30, 0, p, 0.7, false);
+        });
+    } catch (err) { listDiv.innerHTML = "Erreur de connexion."; }
+}
+
+function triggerJump(e) {
+    if (e) {
+        if (e.type === 'touchstart') isTouch = true;
+        if (e.type === 'mousedown' && isTouch) return;
+        e.preventDefault(); e.stopPropagation();
+    }
+    const now = Date.now();
+    if (now - lastJumpTime < 80) return; 
+    lastJumpTime = now;
+    enableMusic();
+    if (!aiActive && bird.alive && gameActive) bird.v = -8.5;
+}
+
+canvas.addEventListener('touchstart', triggerJump, { passive: false });
+canvas.addEventListener('mousedown', (e) => { if (e.button === 0) triggerJump(e); }, { passive: false });
+canvas.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); }, { passive: false });
 
 function enableMusic() { if(!isMusicMuted) music.play().catch(() => {}); }
-function toggleMusic() {
+function toggleMusic(e) {
+    if(e) { e.stopPropagation(); e.preventDefault(); }
     isMusicMuted = !isMusicMuted;
     if(isMusicMuted) music.pause(); else music.play();
     document.getElementById('musicBtn').innerText = isMusicMuted ? "🔇" : "🔊";
 }
 
 async function checkAutoLogin() {
-    const savedPseudo = localStorage.getItem('flappy_pseudo');
-    const savedPass = localStorage.getItem('flappy_pass');
+    const savedPseudo = localStorage.getItem('flappy_pseudo'), savedPass = localStorage.getItem('flappy_pass');
     if(savedPseudo && savedPass) {
         document.getElementById('pseudoBox').value = savedPseudo;
         document.getElementById('passBox').value = savedPass;
-        await login(true);
+        await login();
     }
 }
 
@@ -120,9 +258,10 @@ async function saveToCloud() {
     } catch(e) {}
 }
 
-async function login(isAuto = false) {
-    const p = document.getElementById('pseudoBox').value.trim();
-    const w = document.getElementById('passBox').value.trim();
+async function login(e) {
+    if(e) e.stopPropagation();
+    const p = document.getElementById('pseudoBox').value.trim(), w = document.getElementById('passBox').value.trim();
+    if(!p) return;
     try {
         const res = await fetch(`${UPSTASH_URL}/get/${p}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
         const data = await res.json();
@@ -130,20 +269,15 @@ async function login(isAuto = false) {
             let cloud = JSON.parse(data.result);
             if(cloud.password === w) { 
                 userData = cloud; setConnected(true);
-                if(document.getElementById('rememberBox').checked || isAuto) {
-                    localStorage.setItem('flappy_pseudo', p); localStorage.setItem('flappy_pass', w);
-                }
-            } else if(!isAuto) alert("Pass incorrect");
+                localStorage.setItem('flappy_pseudo', p); localStorage.setItem('flappy_pass', w);
+            } else if(e) alert("Pass incorrect");
         }
     } catch(e) {}
 }
 
-function logout() {
-    localStorage.removeItem('flappy_pseudo');
-    localStorage.removeItem('flappy_pass');
-    document.getElementById('pseudoBox').value = "";
-    document.getElementById('passBox').value = "";
-    document.getElementById('rememberBox').checked = false;
+function logout(e) {
+    if(e) e.stopPropagation();
+    localStorage.removeItem('flappy_pseudo'); localStorage.removeItem('flappy_pass');
     userData = { pseudo: "Joueur", password: "", highScore: 0, coins: 0, skin: "#f7d300", hat: "" };
     setConnected(false);
 }
@@ -152,14 +286,10 @@ function setConnected(bool) {
     document.getElementById('dot').className = bool ? "status-dot status-online" : "status-dot";
     document.getElementById('statusTxt').innerText = bool ? userData.pseudo : "Hors-ligne";
     document.getElementById('authSection').classList.toggle('hidden', bool);
-    document.getElementById('logoutBtn').classList.toggle('hidden', !bool);
+    document.getElementById('loggedInActions').classList.toggle('hidden', !bool);
+    document.getElementById('accountManager').classList.toggle('hidden', !bool || userData.pseudo === "Joueur");
     updateUI();
 }
-
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-let bird = { x: 100, y: 300, v: 0, angle: 0, alive: false };
-let pipes = [], gameCoins = [], particles = [], frame = 0, gameActive = false, score = 0, aiActive = false;
 
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resize); resize();
@@ -169,17 +299,16 @@ function createExplosion() {
     for(let i=0; i<15; i++) particles.push({ x: bird.x, y: bird.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1.0, color: userData.skin });
 }
 
-function jump() { if(bird.alive) { bird.v = -8.5; enableMusic(); } }
-
-function activateAutoClick() {
+function activateAutoClick(e) {
+    if(e) { e.stopPropagation(); e.preventDefault(); }
     if(!aiActive && userData.coins >= 10 && gameActive && bird.alive) {
         userData.coins -= 10; aiActive = true; updateUI(); saveToCloud();
         let timeLeft = 10; const btn = document.getElementById('autoClickBtn');
         btn.style.background = "#2ecc71";
-        const countdown = setInterval(() => {
+        aiInterval = setInterval(() => {
             timeLeft--;
-            if (timeLeft > 0 && bird.alive) btn.innerText = `IA ACTIVE (${timeLeft}s)`;
-            else { clearInterval(countdown); aiActive = false; btn.style.background = "#e67e22"; btn.innerText = "IA AUTO (10🪙) [Z]"; }
+            if (timeLeft > 0 && bird.alive && gameActive) btn.innerText = `IA ACTIVE (${timeLeft}s)`;
+            else { aiActive = false; clearInterval(aiInterval); btn.style.background = "#e67e22"; btn.innerText = "IA AUTO (10🪙) [Z]"; }
         }, 1000);
     }
 }
@@ -187,7 +316,6 @@ function activateAutoClick() {
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#70c5ce"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    
     clouds.forEach(c => {
         c.x -= c.s; if(c.x < -100) c.x = canvas.width + 100;
         ctx.fillStyle = "rgba(255,255,255,0.7)";
@@ -198,7 +326,7 @@ function update() {
         if(bird.alive) {
             if(aiActive) {
                 let n = pipes.find(p => p.x + 80 > bird.x - 20);
-                if(bird.y > (n ? n.top + 95 : canvas.height/2) + 10) jump();
+                if(bird.y > (n ? n.top + 95 : canvas.height/2) + 10) bird.v = -8.5;
             }
             bird.v += 0.55; bird.y += bird.v; bird.angle = Math.min(Math.PI/4, Math.max(-Math.PI/6, bird.v * 0.05));
             if(frame % 100 === 0) {
@@ -216,6 +344,7 @@ function update() {
             });
             if(bird.y > canvas.height - 75 || bird.y < 0) { bird.alive = false; createExplosion(); }
             frame++;
+            drawFullBird(ctx, bird.x, bird.y, bird.angle, userData, 1, true);
         } else if(particles.length === 0) endGame();
         
         pipes.forEach(p => {
@@ -234,25 +363,6 @@ function update() {
         if(p.life <= 0) particles.splice(i, 1);
     });
 
-    if(bird.alive || (gameActive && particles.length > 0)) {
-        let displayName = (userData.pseudo === "Joueur" || !userData.password) ? "Anonyme" : userData.pseudo;
-        ctx.save();
-        ctx.font = "bold 18px Arial"; ctx.textAlign = "center"; ctx.lineWidth = 4; ctx.strokeStyle = "black";
-        ctx.strokeText(displayName, bird.x, bird.y - 50);
-        ctx.fillStyle = "white"; ctx.fillText(displayName, bird.x, bird.y - 50);
-        ctx.restore();
-
-        ctx.save(); ctx.translate(bird.x, bird.y); ctx.rotate(bird.angle);
-        if(userData.hat) { ctx.font = "24px Arial"; ctx.textAlign = "center"; ctx.fillText(userData.hat, 0, -18); }
-        ctx.fillStyle = userData.skin; ctx.strokeStyle = "black"; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.ellipse(0, 0, 20, 17, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-        let w = Math.sin(frame * 0.4) * 8;
-        ctx.fillStyle = "white"; ctx.beginPath(); ctx.ellipse(-8, w, 11, 7, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(10, -6, 7, 0, 7); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(12, -6, 2.5, 0, 7); ctx.fill();
-        ctx.fillStyle = "#f75d15"; ctx.beginPath(); ctx.ellipse(18, 2, 10, 6, 0, 0, 7); ctx.fill(); ctx.stroke();
-        ctx.restore();
-    }
     ctx.fillStyle = "#ded895"; ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
     ctx.fillStyle = "#73bf2e"; ctx.fillRect(0, canvas.height - 75, canvas.width, 25);
     requestAnimationFrame(update);
@@ -267,22 +377,22 @@ function updateUI() {
         const div = document.createElement('div');
         div.className = `item-box ${userData.skin === c ? 'selected' : ''}`;
         div.innerHTML = `<div style="width:25px;height:25px;border-radius:50%;background:${c};border:2px solid white"></div>`;
-        div.onclick = () => { userData.skin = c; saveToCloud(); updateUI(); }; sGrid.appendChild(div);
+        div.onclick = (e) => { e.stopPropagation(); userData.skin = c; saveToCloud(); updateUI(); }; sGrid.appendChild(div);
     });
     const hGrid = document.getElementById('hatGrid'); hGrid.innerHTML = "";
     hatEmojis.forEach(e => {
         const div = document.createElement('div');
         div.className = `item-box ${userData.hat === e ? 'selected' : ''}`;
         div.innerText = e || "❌";
-        div.onclick = () => { userData.hat = e; saveToCloud(); updateUI(); }; hGrid.appendChild(div);
+        div.onclick = (ev) => { ev.stopPropagation(); userData.hat = e; saveToCloud(); updateUI(); }; hGrid.appendChild(div);
     });
 }
 
-function startGame() {
+function startGame(e) {
+    if(e) { e.stopPropagation(); e.preventDefault(); }
     bird = { x: 100, y: canvas.height/2, v: 0, angle: 0, alive: true };
     pipes = []; gameCoins = []; particles = []; score = 0; frame = 0; gameActive = true;
     document.getElementById('gameScore').innerText = "0";
-    document.getElementById('gameBestScore').innerText = "RECORD: " + userData.highScore;
     document.getElementById('newRecordMsg').classList.add('hidden');
     openMenu('none');
     document.getElementById('uiToHide').classList.add('hidden');
@@ -291,41 +401,39 @@ function startGame() {
 }
 
 function endGame() {
-    gameActive = false; 
-    let isNewRecord = false;
-    if(score > userData.highScore) {
-        userData.highScore = score;
-        isNewRecord = true;
-    }
+    gameActive = false;
+    if(score > userData.highScore) { userData.highScore = score; document.getElementById('newRecordMsg').classList.remove('hidden'); }
     saveToCloud(); 
     document.getElementById('uiToHide').classList.remove('hidden');
     document.getElementById('gameScoreContainer').classList.add('hidden');
     document.getElementById('autoClickBtn').classList.add('hidden');
     document.getElementById('finalScore').innerText = score;
-    
-    if(isNewRecord && score > 0) {
-        document.getElementById('newRecordMsg').classList.remove('hidden');
-    }
-    
     openMenu('gameOverMenu');
     updateUI();
 }
 
-function openMenu(id) {
+function openMenu(id, e) {
+    if(e) { e.stopPropagation(); e.preventDefault(); }
     document.querySelectorAll('.overlay').forEach(m => m.classList.add('hidden'));
     if(id !== 'none') document.getElementById(id).classList.remove('hidden');
 }
 
-async function register() {
-    const p = document.getElementById('pseudoBox').value.trim();
-    const w = document.getElementById('passBox').value.trim();
+async function register(e) {
+    if(e) { e.stopPropagation(); e.preventDefault(); }
+    const p = document.getElementById('pseudoBox').value.trim(), w = document.getElementById('passBox').value.trim();
     if(!p || !w) return alert("Nom et Pass requis !");
+    const res = await fetch(`${UPSTASH_URL}/get/${p}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+    const data = await res.json();
+    if(data.result) return alert("Nom pris !");
     userData.pseudo = p; userData.password = w;
     await saveToCloud(); setConnected(true);
 }
 
-window.addEventListener("mousedown", (e) => { if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'LABEL') jump(); });
-window.addEventListener("keydown", (e) => { if(e.code === "Space") jump(); if(e.key === "z" || e.key === "Z") activateAutoClick(); });
+window.addEventListener("keydown", (e) => { 
+    if(e.code === "Space") { e.preventDefault(); if (!e.repeat) triggerJump(); }
+    if(e.key === "z" || e.key === "Z") activateAutoClick(); 
+});
+
 updateUI(); update();
 </script>
 </body>
