@@ -3,20 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Flappy Worlds - Bird Leaderboard</title>
+    <title>Flappy Worlds</title>
     <style>
-        /* CORRECTIF ABSOLU : Enlève la latence de 300ms sur TOUS les clics */
         * { touch-action: manipulation !important; }
-
         body, html { 
             margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #70c5ce; 
             font-family: 'Arial Black', sans-serif; 
-            /* Empêche la sélection de texte lors du spam-clic */
             user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none;
         }
         #gameCanvas { 
             display: block; width: 100vw; height: 100vh; cursor: pointer; 
-            /* Supprime le flash bleu au clic sur mobile et force l'arrêt des gestes */
             -webkit-tap-highlight-color: transparent; 
             touch-action: none !important;
         }
@@ -40,14 +36,12 @@
         .item-box.selected { border-color: #F7FD2B; background: rgba(247, 253, 43, 0.2); }
         .music-ctrl { position: fixed; bottom: 20px; left: 20px; z-index: 300; min-width: 50px; background: #34495e; }
         
-        /* Styles Leaderboard */
         .leaderboard-container { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 20px; border: 3px solid #F7FD2B; min-width: 320px; margin-top: 10px; }
         .lb-table { width: 100%; border-collapse: collapse; font-size: 16px; }
         .lb-table th { border-bottom: 2px solid #F7FD2B; color: #F7FD2B; padding: 8px; font-size: 12px; }
         .lb-table td { padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); vertical-align: middle; }
         .my-score-row { background: rgba(247, 253, 43, 0.2); }
         .lb-bird-canvas { vertical-align: middle; }
-
         .account-actions { margin-top: 8px; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
         .btn-small { min-width: 80px; padding: 4px 8px; font-size: 10px; margin: 0; box-shadow: 0 3px 0 #666; }
     </style>
@@ -71,10 +65,8 @@
         <div id="loggedInActions" class="hidden">
             <button id="logoutBtn" class="btn" style="background:#c0392b; min-width:100px; padding:5px; font-size:10px; margin-bottom: 5px;" onclick="logout(event)">DÉCONNEXION</button>
         </div>
-        
         <div class="high-score">RECORD: <span id="highScoreDisp">0</span></div>
         <div class="coins-display">OR: <span id="coinsDisp">0</span> 🪙</div>
-        
         <div id="accountManager" class="account-actions hidden">
             <button class="btn btn-small" style="background:#f1c40f;" onclick="renameAccount(event)">RENOMMER</button>
             <button class="btn btn-small" style="background:#e74c3c;" onclick="deleteAccount(event)">SUPPRIMER</button>
@@ -121,26 +113,20 @@
 <canvas id="gameCanvas"></canvas>
 
 <script>
-// --- ANTI DOUBLE CLIC / ZOOM IOS BRUTAL ---
-document.addEventListener('touchstart', function(event) {
-    if (event.touches.length > 1) { event.preventDefault(); } // Empêche le zoom avec 2 doigts
-}, { passive: false });
-
+// ANTI DOUBLE-CLIC / ZOOM
+document.addEventListener('touchstart', function(e) { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
 let lastTouchEnd = 0;
-document.addEventListener('touchend', function(event) {
-    let now = (new Date()).getTime();
-    if (now - lastTouchEnd <= 300) {
-        event.preventDefault(); // Empêche le double-tap to zoom
-    }
+document.addEventListener('touchend', function(e) {
+    let now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
     lastTouchEnd = now;
 }, { passive: false });
-// ------------------------------------------
 
 const UPSTASH_URL = "https://adequate-vulture-7895.upstash.io";
 const UPSTASH_TOKEN = "AR7XAAImcDEzNDliNDI3NDRiZjM0OTY4YjJiYjcxNTVmY2RkOTBmZnAxNzg5NQ";
 
 let userData = { pseudo: "Joueur", password: "", highScore: 0, coins: 0, skin: "#f7d300", hat: "" };
-let clouds = [];
+let clouds = [], topPlayersData = []; 
 const skinColors = ["#f7d300","#ff4444","#44ff44","#44aaff","#9b59b6","#e67e22","#ff9ff3","#1dd1a1","#ffffff","#000000"];
 const hatEmojis = ["", "🎩", "👑", "🏓", "🎓", "🧢", "📬", "🎀", "🌵", "🍕"];
 const music = document.getElementById("bgMusic");
@@ -167,7 +153,8 @@ function drawFullBird(c, x, y, angle, data, scale = 1, showLabel = false) {
     if(data.hat) { c.font = "24px Arial"; c.textAlign = "center"; c.fillText(data.hat, 0, -18); }
     c.fillStyle = data.skin; c.strokeStyle = "black"; c.lineWidth = 2;
     c.beginPath(); c.ellipse(0, 0, 20, 17, 0, 0, Math.PI*2); c.fill(); c.stroke();
-    let w = Math.sin(Date.now() * 0.01) * 5; 
+    // BATTEMENT D'AILE CONTINU
+    let w = Math.sin(Date.now() * 0.015) * 6; 
     c.fillStyle = "white"; c.beginPath(); c.ellipse(-8, w, 11, 7, 0, 0, Math.PI*2); c.fill(); c.stroke();
     c.fillStyle = "white"; c.beginPath(); c.arc(10, -6, 7, 0, 7); c.fill(); c.stroke();
     c.fillStyle = "black"; c.beginPath(); c.arc(12, -6, 2.5, 0, 7); c.fill();
@@ -180,23 +167,18 @@ async function showLeaderboard(e) {
     openMenu('leaderboardMenu');
     const listDiv = document.getElementById('leaderboardList');
     listDiv.innerHTML = "Recherche des champions...";
-
     try {
         const resKeys = await fetch(`${UPSTASH_URL}/keys/*`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
         const keys = await resKeys.json();
         if (!keys.result || keys.result.length === 0) { listDiv.innerHTML = "Aucun joueur enregistré."; return; }
-
         const allData = await Promise.all(keys.result.map(async (key) => {
             const r = await fetch(`${UPSTASH_URL}/get/${key}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
-            const d = await r.json();
-            return JSON.parse(d.result);
+            const d = await r.json(); return JSON.parse(d.result);
         }));
-
         allData.sort((a, b) => b.highScore - a.highScore);
-        const topPlayers = allData.slice(0, 5);
-
+        topPlayersData = allData.slice(0, 5); 
         let html = '<table class="lb-table"><tr><th>#</th><th>OISEAU</th><th>JOUEUR</th><th>SCORE</th></tr>';
-        topPlayers.forEach((p, i) => {
+        topPlayersData.forEach((p, i) => {
             const medals = ["🥇", "🥈", "🥉", "4", "5"];
             html += `<tr class="${p.pseudo === userData.pseudo ? 'my-score-row' : ''}">
                 <td style="width:30px; text-align:center;">${medals[i]}</td>
@@ -206,12 +188,78 @@ async function showLeaderboard(e) {
             </tr>`;
         });
         listDiv.innerHTML = html + '</table>';
-
-        topPlayers.forEach((p, i) => {
-            const lbCanvas = document.getElementById(`lbBird_${i}`);
-            if (lbCanvas) drawFullBird(lbCanvas.getContext('2d'), 25, 30, 0, p, 0.7, false);
-        });
     } catch (err) { listDiv.innerHTML = "Erreur de connexion."; }
+}
+
+function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#70c5ce"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    clouds.forEach(c => {
+        c.x -= c.s; if(c.x < -100) c.x = canvas.width + 100;
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.beginPath(); ctx.arc(c.x, c.y, 20, 0, 7); ctx.arc(c.x+20, c.y-10, 25, 0, 7); ctx.arc(c.x+40, c.y, 20, 0, 7); ctx.fill();
+    });
+
+    // ANIMATION PERMANENTE DU CLASSEMENT
+    if(!document.getElementById('leaderboardMenu').classList.contains('hidden')) {
+        topPlayersData.forEach((p, i) => {
+            const lbCanvas = document.getElementById(`lbBird_${i}`);
+            if (lbCanvas) {
+                const lctx = lbCanvas.getContext('2d');
+                lctx.clearRect(0,0,50,50);
+                drawFullBird(lctx, 25, 30, 0, p, 0.7, false);
+            }
+        });
+    }
+
+    if(gameActive) {
+        if(bird.alive) {
+            if(aiActive) {
+                let n = pipes.find(p => p.x + 80 > bird.x - 20);
+                if(bird.y > (n ? n.top + 95 : canvas.height/2) + 10) bird.v = -8.5;
+            }
+            bird.v += 0.55; 
+            bird.y += bird.v;
+            
+            // --- LOGIQUE CHUTE LIBRE (ROTATION) ---
+            // On ajuste l'angle en fonction de la vitesse verticale
+            let targetAngle = Math.min(Math.PI/2, Math.max(-Math.PI/4, bird.v * 0.1));
+            bird.angle += (targetAngle - bird.angle) * 0.15; 
+
+            if(frame % 100 === 0) {
+                let top = Math.random()*(canvas.height-400)+100;
+                pipes.push({ x: canvas.width, top: top, bottom: top + 190, passed: false });
+                if(Math.random() > 0.4) gameCoins.push({ x: canvas.width + 35, y: top + 95, collected: false });
+            }
+            pipes.forEach(p => {
+                p.x -= 3.5;
+                if(bird.x+15 > p.x && bird.x-15 < p.x+80 && (bird.y-15 < p.top || bird.y+15 > p.bottom)) { bird.alive = false; createExplosion(); }
+                if(p.x < bird.x && !p.passed) { p.passed = true; score++; document.getElementById('gameScore').innerText = score; }
+            });
+            gameCoins.forEach(c => {
+                c.x -= 3.5; if(!c.collected && Math.hypot(bird.x - c.x, bird.y - c.y) < 30) { c.collected = true; userData.coins++; updateUI(); saveToCloud(); }
+            });
+            if(bird.y > canvas.height - 75 || bird.y < 0) { bird.alive = false; createExplosion(); }
+            frame++;
+            drawFullBird(ctx, bird.x, bird.y, bird.angle, userData, 1, true);
+        } else if(particles.length === 0) endGame();
+        pipes.forEach(p => {
+            ctx.fillStyle = "#73bf2e"; ctx.strokeStyle = "black"; ctx.lineWidth = 3;
+            ctx.fillRect(p.x, 0, 80, p.top); ctx.strokeRect(p.x, -5, 80, p.top+5);
+            ctx.fillRect(p.x-5, p.top-25, 90, 25); ctx.strokeRect(p.x-5, p.top-25, 90, 25);
+            ctx.fillRect(p.x, p.bottom, 80, canvas.height); ctx.strokeRect(p.x, p.bottom, 80, canvas.height);
+            ctx.fillRect(p.x-5, p.bottom, 90, 25); ctx.strokeRect(p.x-5, p.bottom, 90, 25);
+        });
+        gameCoins.forEach(c => { if(!c.collected) { ctx.fillStyle = "#F7FD2B"; ctx.beginPath(); ctx.arc(c.x, c.y, 12, 0, 7); ctx.fill(); ctx.stroke(); } });
+    }
+    particles.forEach((p, i) => {
+        p.x += p.vx; p.y += p.vy; p.vy += 0.4; p.life -= 0.02;
+        ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, p.life); ctx.fillRect(p.x, p.y, 8, 8); ctx.globalAlpha = 1;
+        if(p.life <= 0) particles.splice(i, 1);
+    });
+    ctx.fillStyle = "#ded895"; ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+    ctx.fillStyle = "#73bf2e"; ctx.fillRect(0, canvas.height - 75, canvas.width, 25);
+    requestAnimationFrame(update);
 }
 
 function triggerJump(e) {
@@ -229,7 +277,6 @@ function triggerJump(e) {
 
 canvas.addEventListener('touchstart', triggerJump, { passive: false });
 canvas.addEventListener('mousedown', (e) => { if (e.button === 0) triggerJump(e); }, { passive: false });
-canvas.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); }, { passive: false });
 
 function enableMusic() { if(!isMusicMuted) music.play().catch(() => {}); }
 function toggleMusic(e) {
@@ -311,61 +358,6 @@ function activateAutoClick(e) {
             else { aiActive = false; clearInterval(aiInterval); btn.style.background = "#e67e22"; btn.innerText = "IA AUTO (10🪙) [Z]"; }
         }, 1000);
     }
-}
-
-function update() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#70c5ce"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    clouds.forEach(c => {
-        c.x -= c.s; if(c.x < -100) c.x = canvas.width + 100;
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.beginPath(); ctx.arc(c.x, c.y, 20, 0, 7); ctx.arc(c.x+20, c.y-10, 25, 0, 7); ctx.arc(c.x+40, c.y, 20, 0, 7); ctx.fill();
-    });
-
-    if(gameActive) {
-        if(bird.alive) {
-            if(aiActive) {
-                let n = pipes.find(p => p.x + 80 > bird.x - 20);
-                if(bird.y > (n ? n.top + 95 : canvas.height/2) + 10) bird.v = -8.5;
-            }
-            bird.v += 0.55; bird.y += bird.v; bird.angle = Math.min(Math.PI/4, Math.max(-Math.PI/6, bird.v * 0.05));
-            if(frame % 100 === 0) {
-                let top = Math.random()*(canvas.height-400)+100;
-                pipes.push({ x: canvas.width, top: top, bottom: top + 190, passed: false });
-                if(Math.random() > 0.4) gameCoins.push({ x: canvas.width + 35, y: top + 95, collected: false });
-            }
-            pipes.forEach(p => {
-                p.x -= 3.5;
-                if(bird.x+15 > p.x && bird.x-15 < p.x+80 && (bird.y-15 < p.top || bird.y+15 > p.bottom)) { bird.alive = false; createExplosion(); }
-                if(p.x < bird.x && !p.passed) { p.passed = true; score++; document.getElementById('gameScore').innerText = score; }
-            });
-            gameCoins.forEach(c => {
-                c.x -= 3.5; if(!c.collected && Math.hypot(bird.x - c.x, bird.y - c.y) < 30) { c.collected = true; userData.coins++; updateUI(); saveToCloud(); }
-            });
-            if(bird.y > canvas.height - 75 || bird.y < 0) { bird.alive = false; createExplosion(); }
-            frame++;
-            drawFullBird(ctx, bird.x, bird.y, bird.angle, userData, 1, true);
-        } else if(particles.length === 0) endGame();
-        
-        pipes.forEach(p => {
-            ctx.fillStyle = "#73bf2e"; ctx.strokeStyle = "black"; ctx.lineWidth = 3;
-            ctx.fillRect(p.x, 0, 80, p.top); ctx.strokeRect(p.x, -5, 80, p.top+5);
-            ctx.fillRect(p.x-5, p.top-25, 90, 25); ctx.strokeRect(p.x-5, p.top-25, 90, 25);
-            ctx.fillRect(p.x, p.bottom, 80, canvas.height); ctx.strokeRect(p.x, p.bottom, 80, canvas.height);
-            ctx.fillRect(p.x-5, p.bottom, 90, 25); ctx.strokeRect(p.x-5, p.bottom, 90, 25);
-        });
-        gameCoins.forEach(c => { if(!c.collected) { ctx.fillStyle = "#F7FD2B"; ctx.beginPath(); ctx.arc(c.x, c.y, 12, 0, 7); ctx.fill(); ctx.stroke(); } });
-    }
-
-    particles.forEach((p, i) => {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.4; p.life -= 0.02;
-        ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, p.life); ctx.fillRect(p.x, p.y, 8, 8); ctx.globalAlpha = 1;
-        if(p.life <= 0) particles.splice(i, 1);
-    });
-
-    ctx.fillStyle = "#ded895"; ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-    ctx.fillStyle = "#73bf2e"; ctx.fillRect(0, canvas.height - 75, canvas.width, 25);
-    requestAnimationFrame(update);
 }
 
 function updateUI() {
