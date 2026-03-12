@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Flappy Worlds</title>
+    <title>Flappy Worlds - Quêtes & Leaderboard</title>
     <style>
+        /* --- TOUT LE CSS D'ORIGINE CONSERVÉ --- */
         * { touch-action: manipulation !important; }
         body, html { 
             margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #70c5ce; 
@@ -25,7 +26,6 @@
         .btn { background: #e67e22; border: 3px solid #fff; color: white; padding: 10px 15px; font-size: 14px; cursor: pointer; border-radius: 10px; min-width: 150px; box-shadow: 0 5px 0 #a85d1a; font-family: inherit; margin: 5px; transition: 0.1s; position: relative; z-index: 301; }
         .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #a85d1a; }
         .hidden { display: none !important; }
-        .remember-me { font-size: 11px; margin-top: 5px; cursor: pointer; display: flex; align-items: center; justify-content: flex-end; }
         #gameScoreContainer { position: fixed; top: 8%; left: 50%; transform: translateX(-50%); text-align: center; z-index: 200; pointer-events: none; }
         #gameScore { font-size: 70px; color: white; text-shadow: 4px 4px 0 #000; line-height: 1; }
         #gameBestScore { font-size: 20px; color: #F7FD2B; text-shadow: 2px 2px 0 #000; }
@@ -36,19 +36,45 @@
         .item-box.selected { border-color: #F7FD2B; background: rgba(247, 253, 43, 0.2); }
         .music-ctrl { position: fixed; bottom: 20px; left: 20px; z-index: 300; min-width: 50px; background: #34495e; }
         
+        .quest-panel {
+            position: fixed; left: 20px; top: 50%; transform: translateY(-50%);
+            width: 220px; background: rgba(0,0,0,0.7); border: 3px solid #F7FD2B;
+            border-radius: 15px; padding: 15px; z-index: 150; color: white; text-align: left;
+        }
+        .quest-item { margin-bottom: 15px; font-size: 11px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
+        .quest-title { color: #F7FD2B; font-size: 13px; display: block; margin-bottom: 3px; }
+        
+        /* INDICATEUR DE RÉCOMPENSE AJOUTÉ ICI */
+        .reward-badge { color: #2ecc71; font-weight: bold; margin-left: 5px; }
+
+        .quest-stats { float: right; color: #fff; font-size: 10px; }
+        .progress-bar { width: 100%; height: 8px; background: #222; border-radius: 4px; margin-top: 5px; overflow: hidden; border: 1px solid #444; clear: both; }
+        .progress-fill { height: 100%; background: #2ecc71; width: 0%; transition: width 0.5s; }
+        .quest-timer { font-size: 10px; color: #aaa; text-align: center; margin-bottom: 8px; font-family: monospace; }
+
+        #questNotif {
+            position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
+            background: #2ecc71; color: white; padding: 15px 30px; border-radius: 50px;
+            border: 3px solid white; z-index: 999; transition: 0.5s; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            font-weight: bold;
+        }
+        #questNotif.show { top: 20px; }
+        #inGameCoins { position: fixed; top: 20px; left: 20px; z-index: 250; pointer-events: none; font-size: 26px; color: #F7FD2B; text-shadow: 2px 2px 0 #000; }
         .leaderboard-container { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 20px; border: 3px solid #F7FD2B; min-width: 320px; margin-top: 10px; }
         .lb-table { width: 100%; border-collapse: collapse; font-size: 16px; }
         .lb-table th { border-bottom: 2px solid #F7FD2B; color: #F7FD2B; padding: 8px; font-size: 12px; }
         .lb-table td { padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); vertical-align: middle; }
         .my-score-row { background: rgba(247, 253, 43, 0.2); }
-        .lb-bird-canvas { vertical-align: middle; }
         .account-actions { margin-top: 8px; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
         .btn-small { min-width: 80px; padding: 4px 8px; font-size: 10px; margin: 0; box-shadow: 0 3px 0 #666; }
+        .remember-me { font-size: 11px; margin-top: 5px; cursor: pointer; display: flex; align-items: center; justify-content: flex-end; }
     </style>
 </head>
 <body onload="checkAutoLogin()">
 
 <audio id="bgMusic" loop preload="auto"><source src="Pixel_Pulse_FULL_SONG_MusicGPT.mp3" type="audio/mpeg"></audio>
+<div id="questNotif">MISSION RÉUSSIE ! +15 🪙</div>
+<div id="inGameCoins" class="hidden"><span id="liveCoinCount">0</span> 🪙</div>
 
 <div class="top-right-bar">
     <div id="uiToHide">
@@ -79,10 +105,34 @@
     <div id="gameBestScore">RECORD: 0</div>
 </div>
 
-<button id="autoClickBtn" class="btn hidden" style="position:fixed; bottom:20px; right:20px; z-index:300;" onclick="activateAutoClick(event)">IA AUTO (10🪙) [Z]</button>
+<button id="autoClickBtn" class="btn hidden" style="position:fixed; bottom:20px; right:20px; z-index:300;" onclick="activateAutoClick(event)">IA AUTO (300🪙) [Z]</button>
 <button id="musicBtn" class="btn music-ctrl" onclick="toggleMusic(event)">🔊</button>
 
 <div id="mainMenu" class="overlay">
+    <div class="quest-panel">
+        <h3 style="margin:0; color:#F7FD2B; text-align:center; font-size:16px;">MISSIONS</h3>
+        <div id="q-timer" class="quest-timer">Réinit dans: 00:00:00</div>
+        
+        <div class="quest-item">
+            <span class="quest-stats" id="q1-stats">0 / 20</span>
+            <span class="quest-title">🏆 Score de Maître <span class="reward-badge">+15 🪙</span></span>
+            Atteindre 20 points
+            <div class="progress-bar"><div id="q1-bar" class="progress-fill"></div></div>
+        </div>
+        <div class="quest-item">
+            <span class="quest-stats" id="q2-stats">0 / 50</span>
+            <span class="quest-title">💰 Chasseur d'Or <span class="reward-badge">+15 🪙</span></span>
+            Cumuler 50 pièces
+            <div class="progress-bar"><div id="q2-bar" class="progress-fill"></div></div>
+        </div>
+        <div class="quest-item">
+            <span class="quest-stats" id="q3-stats">0 / 100</span>
+            <span class="quest-title">✈️ Grand Voyageur <span class="reward-badge">+15 🪙</span></span>
+            Passer 100 tuyaux
+            <div class="progress-bar"><div id="q3-bar" class="progress-fill"></div></div>
+        </div>
+    </div>
+
     <h1 class="game-title">FLAPPY<br>WORLDS</h1>
     <div class="menu-group">
         <button class="btn" style="background:#55AA22;" onclick="startGame(event)">JOUER</button><br>
@@ -94,9 +144,7 @@
 
 <div id="leaderboardMenu" class="overlay hidden">
     <h2 style="color:#F7FD2B">TOP 5 MONDIAL</h2>
-    <div class="leaderboard-container">
-        <div id="leaderboardList">Chargement...</div>
-    </div>
+    <div class="leaderboard-container"><div id="leaderboardList">Chargement...</div></div>
     <button class="btn" style="background:#888; margin-top:20px;" onclick="openMenu('mainMenu', event)">RETOUR</button>
 </div>
 
@@ -113,22 +161,40 @@
 <canvas id="gameCanvas"></canvas>
 
 <script>
-// ANTI DOUBLE-CLIC / ZOOM
-document.addEventListener('touchstart', function(e) { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-let lastTouchEnd = 0;
-document.addEventListener('touchend', function(e) {
-    let now = Date.now();
-    if (now - lastTouchEnd <= 300) e.preventDefault();
-    lastTouchEnd = now;
-}, { passive: false });
-
 const UPSTASH_URL = "https://adequate-vulture-7895.upstash.io";
 const UPSTASH_TOKEN = "AR7XAAImcDEzNDliNDI3NDRiZjM0OTY4YjJiYjcxNTVmY2RkOTBmZnAxNzg5NQ";
 
-let userData = { pseudo: "Joueur", password: "", highScore: 0, coins: 0, skin: "#f7d300", hat: "" };
+let userData = { 
+    pseudo: "Joueur", password: "", highScore: 0, coins: 0, skin: "#f7d300", hat: "",
+    qCoinsCumul: 0, qPipesCumul: 0, lastReset: 0,
+    claimed: { q1: false, q2: false, q3: false }
+};
+
+function updateQuestTimer() {
+    const now = new Date();
+    const tonight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+    const diff = tonight - now;
+    if (userData.lastReset !== now.getDate()) {
+        userData.qCoinsCumul = 0; userData.qPipesCumul = 0;
+        userData.claimed = { q1: false, q2: false, q3: false };
+        userData.lastReset = now.getDate(); saveToCloud();
+    }
+    const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+    const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+    const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+    document.getElementById('q-timer').innerText = `Réinit dans: ${h}:${m}:${s}`;
+}
+setInterval(updateQuestTimer, 1000);
+
+function triggerPopup(text) {
+    const el = document.getElementById('questNotif');
+    el.innerText = text; el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 3000);
+}
+
 let clouds = [], topPlayersData = []; 
 const skinColors = ["#f7d300","#ff4444","#44ff44","#44aaff","#9b59b6","#e67e22","#ff9ff3","#1dd1a1","#ffffff","#000000"];
-const hatEmojis = ["", "🎩", "👑", "🏓", "🎓", "🧢", "📬", "🎀", "🌵", "🍕"];
+const hatEmojis = ["", "🎩", "👑", "🏓", "🎓", "Cap", "📬", "🎀", "🌵", "🍕"];
 const music = document.getElementById("bgMusic");
 let isMusicMuted = false, aiInterval = null, lastJumpTime = 0, isTouch = false;
 
@@ -137,23 +203,137 @@ const ctx = canvas.getContext("2d");
 let bird = { x: 100, y: 300, v: 0, angle: 0, alive: false };
 let pipes = [], gameCoins = [], particles = [], frame = 0, gameActive = false, score = 0, aiActive = false;
 
+async function saveToCloud() {
+    if(userData.pseudo === "Joueur") return;
+    try {
+        await fetch(`${UPSTASH_URL}/set/${userData.pseudo}`, {
+            headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+            body: JSON.stringify(userData), method: "POST"
+        });
+    } catch(e) {}
+}
+
+async function register(e) {
+    if(e) e.stopPropagation();
+    const p = document.getElementById('pseudoBox').value.trim(), w = document.getElementById('passBox').value.trim();
+    if(!p || !w) return alert("Nom et Pass requis !");
+    const res = await fetch(`${UPSTASH_URL}/get/${p}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+    const data = await res.json();
+    if(data.result) return alert("Ce nom est déjà pris !");
+    userData.pseudo = p; userData.password = w;
+    userData.lastReset = new Date().getDate();
+    userData.claimed = { q1: false, q2: false, q3: false };
+    await saveToCloud(); setConnected(true);
+}
+
+async function login(e) {
+    if(e) e.stopPropagation();
+    const p = document.getElementById('pseudoBox').value.trim(), w = document.getElementById('passBox').value.trim();
+    if(!p) return;
+    try {
+        const res = await fetch(`${UPSTASH_URL}/get/${p}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+        const data = await res.json();
+        if(data.result) {
+            let cloud = JSON.parse(data.result);
+            if(cloud.password === w) { 
+                userData = cloud; 
+                if(!userData.claimed) userData.claimed = { q1: false, q2: false, q3: false };
+                setConnected(true);
+                if(document.getElementById('rememberBox').checked) {
+                    localStorage.setItem('flappy_pseudo', p); localStorage.setItem('flappy_pass', w);
+                }
+                updateQuestsUI();
+            } else if(e) alert("Mot de passe incorrect");
+        }
+    } catch(e) {}
+}
+
+function logout(e) {
+    if(e) e.stopPropagation();
+    localStorage.removeItem('flappy_pseudo'); localStorage.removeItem('flappy_pass');
+    userData = { pseudo: "Joueur", password: "", highScore: 0, coins: 0, skin: "#f7d300", hat: "", qCoinsCumul:0, qPipesCumul:0, lastReset: 0, claimed: {q1:false,q2:false,q3:false} };
+    setConnected(false);
+}
+
+async function renameAccount(e) {
+    if(e) e.stopPropagation();
+    const newName = prompt("Nouveau nom :", userData.pseudo);
+    if (!newName || newName === userData.pseudo || newName.length > 12) return;
+    try {
+        const check = await fetch(`${UPSTASH_URL}/get/${newName}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+        const d = await check.json();
+        if (d.result) return alert("Ce nom est déjà pris !");
+        await fetch(`${UPSTASH_URL}/del/${userData.pseudo}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+        userData.pseudo = newName;
+        await saveToCloud();
+        localStorage.setItem('flappy_pseudo', newName);
+        setConnected(true);
+        alert("Succès !");
+    } catch (err) { alert("Erreur."); }
+}
+
+async function deleteAccount(e) {
+    if(e) e.stopPropagation();
+    if (!confirm("Supprimer définitivement ?")) return;
+    try {
+        await fetch(`${UPSTASH_URL}/del/${userData.pseudo}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+        logout();
+    } catch (err) { alert("Erreur."); }
+}
+
+function updateQuestsUI() {
+    const s1 = Math.min(20, userData.highScore);
+    const s2 = Math.min(50, userData.qCoinsCumul);
+    const s3 = Math.min(100, userData.qPipesCumul);
+    document.getElementById('q1-stats').innerText = `${s1} / 20`;
+    document.getElementById('q2-stats').innerText = `${s2} / 50`;
+    document.getElementById('q3-stats').innerText = `${s3} / 100`;
+    document.getElementById('q1-bar').style.width = (s1 / 20 * 100) + "%";
+    document.getElementById('q2-bar').style.width = (s2 / 50 * 100) + "%";
+    document.getElementById('q3-bar').style.width = (s3 / 100 * 100) + "%";
+}
+
+async function showLeaderboard(e) {
+    if(e) e.stopPropagation();
+    openMenu('leaderboardMenu');
+    const listDiv = document.getElementById('leaderboardList');
+    listDiv.innerHTML = "Chargement...";
+    try {
+        const resKeys = await fetch(`${UPSTASH_URL}/keys/*`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+        const keys = await resKeys.json();
+        const allData = await Promise.all(keys.result.map(async (key) => {
+            const r = await fetch(`${UPSTASH_URL}/get/${key}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+            const d = await r.json(); return JSON.parse(d.result);
+        }));
+        allData.sort((a, b) => b.highScore - a.highScore);
+        topPlayersData = allData.slice(0, 5); 
+        let html = '<table class="lb-table"><tr><th>#</th><th>OISEAU</th><th>NOM</th><th>PTS</th></tr>';
+        topPlayersData.forEach((p, i) => {
+            const medals = ["🥇", "🥈", "🥉", "4", "5"];
+            html += `<tr class="${p.pseudo === userData.pseudo ? 'my-score-row' : ''}">
+                <td>${medals[i]}</td>
+                <td><canvas id="lbBird_${i}" width="40" height="40"></canvas></td>
+                <td>${p.pseudo}</td>
+                <td style="color:#F7FD2B">${p.highScore}</td>
+            </tr>`;
+        });
+        listDiv.innerHTML = html + '</table>';
+    } catch (err) { listDiv.innerHTML = "Erreur."; }
+}
+
 function drawFullBird(c, x, y, angle, data, scale = 1, showLabel = false) {
-    c.save();
-    c.translate(x, y);
-    c.scale(scale, scale);
+    c.save(); c.translate(x, y); c.scale(scale, scale);
     if(showLabel) {
-        let name = (data.pseudo === "Joueur" || !data.password) ? "Anonyme" : data.pseudo;
-        c.font = "bold 14px Arial";
-        let tw = c.measureText(name).width;
-        c.fillStyle = "rgba(0,0,0,0.7)";
-        c.beginPath(); if(c.roundRect) c.roundRect(-tw/2 - 8, -55, tw + 16, 22, 8); else c.rect(-tw/2 - 8, -55, tw + 16, 22);
+        let name = (data.pseudo === "Joueur") ? "Anonyme" : data.pseudo;
+        c.font = "bold 14px Arial"; let tw = c.measureText(name).width;
+        c.fillStyle = "rgba(0,0,0,0.7)"; c.beginPath(); 
+        if(c.roundRect) c.roundRect(-tw/2 - 8, -55, tw + 16, 22, 8); else c.rect(-tw/2 - 8, -55, tw + 16, 22);
         c.fill(); c.fillStyle = "white"; c.textAlign = "center"; c.fillText(name, 0, -39);
     }
     c.rotate(angle);
     if(data.hat) { c.font = "24px Arial"; c.textAlign = "center"; c.fillText(data.hat, 0, -18); }
     c.fillStyle = data.skin; c.strokeStyle = "black"; c.lineWidth = 2;
     c.beginPath(); c.ellipse(0, 0, 20, 17, 0, 0, Math.PI*2); c.fill(); c.stroke();
-    // BATTEMENT D'AILE CONTINU
     let w = Math.sin(Date.now() * 0.015) * 6; 
     c.fillStyle = "white"; c.beginPath(); c.ellipse(-8, w, 11, 7, 0, 0, Math.PI*2); c.fill(); c.stroke();
     c.fillStyle = "white"; c.beginPath(); c.arc(10, -6, 7, 0, 7); c.fill(); c.stroke();
@@ -162,52 +342,20 @@ function drawFullBird(c, x, y, angle, data, scale = 1, showLabel = false) {
     c.restore();
 }
 
-async function showLeaderboard(e) {
-    if(e) e.stopPropagation();
-    openMenu('leaderboardMenu');
-    const listDiv = document.getElementById('leaderboardList');
-    listDiv.innerHTML = "Recherche des champions...";
-    try {
-        const resKeys = await fetch(`${UPSTASH_URL}/keys/*`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
-        const keys = await resKeys.json();
-        if (!keys.result || keys.result.length === 0) { listDiv.innerHTML = "Aucun joueur enregistré."; return; }
-        const allData = await Promise.all(keys.result.map(async (key) => {
-            const r = await fetch(`${UPSTASH_URL}/get/${key}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
-            const d = await r.json(); return JSON.parse(d.result);
-        }));
-        allData.sort((a, b) => b.highScore - a.highScore);
-        topPlayersData = allData.slice(0, 5); 
-        let html = '<table class="lb-table"><tr><th>#</th><th>OISEAU</th><th>JOUEUR</th><th>SCORE</th></tr>';
-        topPlayersData.forEach((p, i) => {
-            const medals = ["🥇", "🥈", "🥉", "4", "5"];
-            html += `<tr class="${p.pseudo === userData.pseudo ? 'my-score-row' : ''}">
-                <td style="width:30px; text-align:center;">${medals[i]}</td>
-                <td style="width:60px; text-align:center;"><canvas id="lbBird_${i}" width="50" height="50" class="lb-bird-canvas"></canvas></td>
-                <td style="text-align:left; padding-left:10px;">${p.pseudo}</td>
-                <td style="color:#F7FD2B; font-weight:bold;">${p.highScore}</td>
-            </tr>`;
-        });
-        listDiv.innerHTML = html + '</table>';
-    } catch (err) { listDiv.innerHTML = "Erreur de connexion."; }
-}
-
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#70c5ce"; ctx.fillRect(0,0,canvas.width, canvas.height);
     clouds.forEach(c => {
         c.x -= c.s; if(c.x < -100) c.x = canvas.width + 100;
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.beginPath(); ctx.arc(c.x, c.y, 20, 0, 7); ctx.arc(c.x+20, c.y-10, 25, 0, 7); ctx.arc(c.x+40, c.y, 20, 0, 7); ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.arc(c.x, c.y, 20, 0, 7); ctx.arc(c.x+20, c.y-10, 25, 0, 7); ctx.arc(c.x+40, c.y, 20, 0, 7); ctx.fill();
     });
 
-    // ANIMATION PERMANENTE DU CLASSEMENT
     if(!document.getElementById('leaderboardMenu').classList.contains('hidden')) {
         topPlayersData.forEach((p, i) => {
             const lbCanvas = document.getElementById(`lbBird_${i}`);
             if (lbCanvas) {
                 const lctx = lbCanvas.getContext('2d');
-                lctx.clearRect(0,0,50,50);
-                drawFullBird(lctx, 25, 30, 0, p, 0.7, false);
+                lctx.clearRect(0,0,40,40); drawFullBird(lctx, 20, 25, 0, p, 0.6, false);
             }
         });
     }
@@ -218,14 +366,9 @@ function update() {
                 let n = pipes.find(p => p.x + 80 > bird.x - 20);
                 if(bird.y > (n ? n.top + 95 : canvas.height/2) + 10) bird.v = -8.5;
             }
-            bird.v += 0.55; 
-            bird.y += bird.v;
-            
-            // --- LOGIQUE CHUTE LIBRE (ROTATION) ---
-            // On ajuste l'angle en fonction de la vitesse verticale
+            bird.v += 0.55; bird.y += bird.v;
             let targetAngle = Math.min(Math.PI/2, Math.max(-Math.PI/4, bird.v * 0.1));
             bird.angle += (targetAngle - bird.angle) * 0.15; 
-
             if(frame % 100 === 0) {
                 let top = Math.random()*(canvas.height-400)+100;
                 pipes.push({ x: canvas.width, top: top, bottom: top + 190, passed: false });
@@ -234,21 +377,45 @@ function update() {
             pipes.forEach(p => {
                 p.x -= 3.5;
                 if(bird.x+15 > p.x && bird.x-15 < p.x+80 && (bird.y-15 < p.top || bird.y+15 > p.bottom)) { bird.alive = false; createExplosion(); }
-                if(p.x < bird.x && !p.passed) { p.passed = true; score++; document.getElementById('gameScore').innerText = score; }
+                if(p.x < bird.x && !p.passed) { 
+                    p.passed = true; score++; userData.qPipesCumul++; 
+                    document.getElementById('gameScore').innerText = score;
+                    if(userData.qPipesCumul >= 100 && !userData.claimed.q3) {
+                        userData.claimed.q3 = true; userData.coins += 15;
+                        triggerPopup("✈️ VOYAGEUR REUSSI ! +15 🪙");
+                        saveToCloud(); updateUI();
+                    }
+                }
             });
             gameCoins.forEach(c => {
-                c.x -= 3.5; if(!c.collected && Math.hypot(bird.x - c.x, bird.y - c.y) < 30) { c.collected = true; userData.coins++; updateUI(); saveToCloud(); }
+                c.x -= 3.5; 
+                if(!c.collected && Math.hypot(bird.x - c.x, bird.y - c.y) < 30) { 
+                    c.collected = true; userData.coins++; userData.qCoinsCumul++;
+                    document.getElementById('liveCoinCount').innerText = userData.coins; 
+                    if(userData.qCoinsCumul >= 50 && !userData.claimed.q2) {
+                        userData.claimed.q2 = true; userData.coins += 15;
+                        triggerPopup("💰 CHASSEUR REUSSI ! +15 🪙");
+                    }
+                    updateUI(); saveToCloud();
+                }
             });
+            if(score >= 20 && !userData.claimed.q1) {
+                userData.claimed.q1 = true; userData.coins += 15;
+                triggerPopup("🏆 MAÎTRE REUSSI ! +15 🪙");
+                updateUI(); saveToCloud();
+            }
             if(bird.y > canvas.height - 75 || bird.y < 0) { bird.alive = false; createExplosion(); }
-            frame++;
-            drawFullBird(ctx, bird.x, bird.y, bird.angle, userData, 1, true);
+            frame++; drawFullBird(ctx, bird.x, bird.y, bird.angle, userData, 1, true);
         } else if(particles.length === 0) endGame();
         pipes.forEach(p => {
             ctx.fillStyle = "#73bf2e"; ctx.strokeStyle = "black"; ctx.lineWidth = 3;
             ctx.fillRect(p.x, 0, 80, p.top); ctx.strokeRect(p.x, -5, 80, p.top+5);
-            ctx.fillRect(p.x-5, p.top-25, 90, 25); ctx.strokeRect(p.x-5, p.top-25, 90, 25);
+            ctx.fillRect(p.x - 5, p.top - 20, 90, 20); ctx.strokeRect(p.x - 5, p.top - 20, 90, 20);
+            ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(p.x + 10, 0, 15, p.top - 20);
+            ctx.fillStyle = "#73bf2e";
             ctx.fillRect(p.x, p.bottom, 80, canvas.height); ctx.strokeRect(p.x, p.bottom, 80, canvas.height);
-            ctx.fillRect(p.x-5, p.bottom, 90, 25); ctx.strokeRect(p.x-5, p.bottom, 90, 25);
+            ctx.fillRect(p.x - 5, p.bottom, 90, 20); ctx.strokeRect(p.x - 5, p.bottom, 90, 20);
+            ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(p.x + 10, p.bottom + 20, 15, canvas.height);
         });
         gameCoins.forEach(c => { if(!c.collected) { ctx.fillStyle = "#F7FD2B"; ctx.beginPath(); ctx.arc(c.x, c.y, 12, 0, 7); ctx.fill(); ctx.stroke(); } });
     }
@@ -263,70 +430,31 @@ function update() {
 }
 
 function triggerJump(e) {
-    if (e) {
-        if (e.type === 'touchstart') isTouch = true;
-        if (e.type === 'mousedown' && isTouch) return;
-        e.preventDefault(); e.stopPropagation();
-    }
+    if (e && e.type === 'touchstart') isTouch = true;
     const now = Date.now();
-    if (now - lastJumpTime < 80) return; 
-    lastJumpTime = now;
-    enableMusic();
+    if (now - lastJumpTime < 80) return; lastJumpTime = now;
     if (!aiActive && bird.alive && gameActive) bird.v = -8.5;
 }
 
-canvas.addEventListener('touchstart', triggerJump, { passive: false });
-canvas.addEventListener('mousedown', (e) => { if (e.button === 0) triggerJump(e); }, { passive: false });
+function updateUI() {
+    document.getElementById('highScoreDisp').innerText = userData.highScore;
+    document.getElementById('coinsDisp').innerText = userData.coins;
+    document.getElementById('gameBestScore').innerText = "RECORD: " + userData.highScore;
+    updateQuestsUI();
 
-function enableMusic() { if(!isMusicMuted) music.play().catch(() => {}); }
-function toggleMusic(e) {
-    if(e) { e.stopPropagation(); e.preventDefault(); }
-    isMusicMuted = !isMusicMuted;
-    if(isMusicMuted) music.pause(); else music.play();
-    document.getElementById('musicBtn').innerText = isMusicMuted ? "🔇" : "🔊";
-}
+    const sGrid = document.getElementById('skinGrid'); sGrid.innerHTML = "";
+    skinColors.forEach(c => {
+        const div = document.createElement('div'); div.className = `item-box ${userData.skin === c ? 'selected' : ''}`;
+        div.innerHTML = `<div style="width:25px;height:25px;border-radius:50%;background:${c};border:2px solid white"></div>`;
+        div.onclick = (e) => { e.stopPropagation(); userData.skin = c; saveToCloud(); updateUI(); }; sGrid.appendChild(div);
+    });
 
-async function checkAutoLogin() {
-    const savedPseudo = localStorage.getItem('flappy_pseudo'), savedPass = localStorage.getItem('flappy_pass');
-    if(savedPseudo && savedPass) {
-        document.getElementById('pseudoBox').value = savedPseudo;
-        document.getElementById('passBox').value = savedPass;
-        await login();
-    }
-}
-
-async function saveToCloud() {
-    if(userData.pseudo === "Joueur") return;
-    try {
-        await fetch(`${UPSTASH_URL}/set/${userData.pseudo}`, {
-            headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
-            body: JSON.stringify(userData), method: "POST"
-        });
-    } catch(e) {}
-}
-
-async function login(e) {
-    if(e) e.stopPropagation();
-    const p = document.getElementById('pseudoBox').value.trim(), w = document.getElementById('passBox').value.trim();
-    if(!p) return;
-    try {
-        const res = await fetch(`${UPSTASH_URL}/get/${p}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
-        const data = await res.json();
-        if(data.result) {
-            let cloud = JSON.parse(data.result);
-            if(cloud.password === w) { 
-                userData = cloud; setConnected(true);
-                localStorage.setItem('flappy_pseudo', p); localStorage.setItem('flappy_pass', w);
-            } else if(e) alert("Pass incorrect");
-        }
-    } catch(e) {}
-}
-
-function logout(e) {
-    if(e) e.stopPropagation();
-    localStorage.removeItem('flappy_pseudo'); localStorage.removeItem('flappy_pass');
-    userData = { pseudo: "Joueur", password: "", highScore: 0, coins: 0, skin: "#f7d300", hat: "" };
-    setConnected(false);
+    const hGrid = document.getElementById('hatGrid'); hGrid.innerHTML = "";
+    hatEmojis.forEach(h => {
+        const div = document.createElement('div'); div.className = `item-box ${userData.hat === h ? 'selected' : ''}`;
+        div.innerText = h || "❌";
+        div.onclick = (e) => { e.stopPropagation(); userData.hat = h; saveToCloud(); updateUI(); }; hGrid.appendChild(div);
+    });
 }
 
 function setConnected(bool) {
@@ -338,70 +466,13 @@ function setConnected(bool) {
     updateUI();
 }
 
-function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-window.addEventListener('resize', resize); resize();
-for(let i=0; i<6; i++) clouds.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height*0.5, s: 0.3 + Math.random()*0.5 });
-
-function createExplosion() {
-    for(let i=0; i<15; i++) particles.push({ x: bird.x, y: bird.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1.0, color: userData.skin });
-}
-
-function activateAutoClick(e) {
-    if(e) { e.stopPropagation(); e.preventDefault(); }
-    if(!aiActive && userData.coins >= 10 && gameActive && bird.alive) {
-        userData.coins -= 10; aiActive = true; updateUI(); saveToCloud();
-        let timeLeft = 10; const btn = document.getElementById('autoClickBtn');
-        btn.style.background = "#2ecc71";
-        aiInterval = setInterval(() => {
-            timeLeft--;
-            if (timeLeft > 0 && bird.alive && gameActive) btn.innerText = `IA ACTIVE (${timeLeft}s)`;
-            else { aiActive = false; clearInterval(aiInterval); btn.style.background = "#e67e22"; btn.innerText = "IA AUTO (10🪙) [Z]"; }
-        }, 1000);
+async function checkAutoLogin() {
+    const savedPseudo = localStorage.getItem('flappy_pseudo'), savedPass = localStorage.getItem('flappy_pass');
+    if(savedPseudo && savedPass) {
+        document.getElementById('pseudoBox').value = savedPseudo;
+        document.getElementById('passBox').value = savedPass;
+        await login();
     }
-}
-
-function updateUI() {
-    document.getElementById('highScoreDisp').innerText = userData.highScore;
-    document.getElementById('coinsDisp').innerText = userData.coins;
-    document.getElementById('gameBestScore').innerText = "RECORD: " + userData.highScore;
-    const sGrid = document.getElementById('skinGrid'); sGrid.innerHTML = "";
-    skinColors.forEach(c => {
-        const div = document.createElement('div');
-        div.className = `item-box ${userData.skin === c ? 'selected' : ''}`;
-        div.innerHTML = `<div style="width:25px;height:25px;border-radius:50%;background:${c};border:2px solid white"></div>`;
-        div.onclick = (e) => { e.stopPropagation(); userData.skin = c; saveToCloud(); updateUI(); }; sGrid.appendChild(div);
-    });
-    const hGrid = document.getElementById('hatGrid'); hGrid.innerHTML = "";
-    hatEmojis.forEach(e => {
-        const div = document.createElement('div');
-        div.className = `item-box ${userData.hat === e ? 'selected' : ''}`;
-        div.innerText = e || "❌";
-        div.onclick = (ev) => { ev.stopPropagation(); userData.hat = e; saveToCloud(); updateUI(); }; hGrid.appendChild(div);
-    });
-}
-
-function startGame(e) {
-    if(e) { e.stopPropagation(); e.preventDefault(); }
-    bird = { x: 100, y: canvas.height/2, v: 0, angle: 0, alive: true };
-    pipes = []; gameCoins = []; particles = []; score = 0; frame = 0; gameActive = true;
-    document.getElementById('gameScore').innerText = "0";
-    document.getElementById('newRecordMsg').classList.add('hidden');
-    openMenu('none');
-    document.getElementById('uiToHide').classList.add('hidden');
-    document.getElementById('gameScoreContainer').classList.remove('hidden');
-    document.getElementById('autoClickBtn').classList.remove('hidden');
-}
-
-function endGame() {
-    gameActive = false;
-    if(score > userData.highScore) { userData.highScore = score; document.getElementById('newRecordMsg').classList.remove('hidden'); }
-    saveToCloud(); 
-    document.getElementById('uiToHide').classList.remove('hidden');
-    document.getElementById('gameScoreContainer').classList.add('hidden');
-    document.getElementById('autoClickBtn').classList.add('hidden');
-    document.getElementById('finalScore').innerText = score;
-    openMenu('gameOverMenu');
-    updateUI();
 }
 
 function openMenu(id, e) {
@@ -410,21 +481,64 @@ function openMenu(id, e) {
     if(id !== 'none') document.getElementById(id).classList.remove('hidden');
 }
 
-async function register(e) {
+function startGame(e) {
     if(e) { e.stopPropagation(); e.preventDefault(); }
-    const p = document.getElementById('pseudoBox').value.trim(), w = document.getElementById('passBox').value.trim();
-    if(!p || !w) return alert("Nom et Pass requis !");
-    const res = await fetch(`${UPSTASH_URL}/get/${p}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
-    const data = await res.json();
-    if(data.result) return alert("Nom pris !");
-    userData.pseudo = p; userData.password = w;
-    await saveToCloud(); setConnected(true);
+    bird = { x: 100, y: canvas.height/2, v: 0, angle: 0, alive: true };
+    pipes = []; gameCoins = []; particles = []; score = 0; frame = 0; gameActive = true;
+    document.getElementById('gameScore').innerText = "0";
+    openMenu('none');
+    document.getElementById('uiToHide').classList.add('hidden');
+    document.getElementById('gameScoreContainer').classList.remove('hidden');
+    document.getElementById('autoClickBtn').classList.remove('hidden');
+    document.getElementById('inGameCoins').classList.remove('hidden');
+    document.getElementById('liveCoinCount').innerText = userData.coins;
 }
 
-window.addEventListener("keydown", (e) => { 
-    if(e.code === "Space") { e.preventDefault(); if (!e.repeat) triggerJump(); }
-    if(e.key === "z" || e.key === "Z") activateAutoClick(); 
-});
+function endGame() {
+    gameActive = false;
+    if(score > userData.highScore) { 
+        userData.highScore = score; 
+        document.getElementById('newRecordMsg').classList.remove('hidden'); 
+    }
+    saveToCloud(); 
+    document.getElementById('uiToHide').classList.remove('hidden');
+    document.getElementById('gameScoreContainer').classList.add('hidden');
+    document.getElementById('autoClickBtn').classList.add('hidden');
+    document.getElementById('inGameCoins').classList.add('hidden');
+    document.getElementById('finalScore').innerText = score;
+    openMenu('gameOverMenu');
+    updateUI();
+}
+
+function activateAutoClick() {
+    if(!aiActive && userData.coins >= 300 && gameActive && bird.alive) {
+        userData.coins -= 300; aiActive = true; updateUI(); saveToCloud();
+        let timeLeft = 10; const btn = document.getElementById('autoClickBtn'); btn.style.background = "#2ecc71";
+        aiInterval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft > 0 && bird.alive && gameActive) btn.innerText = `IA ACTIVE (${timeLeft}s)`;
+            else { aiActive = false; clearInterval(aiInterval); btn.style.background = "#e67e22"; btn.innerText = "IA AUTO (300🪙) [Z]"; }
+        }, 1000);
+    }
+}
+
+function toggleMusic(e) {
+    if(e) e.stopPropagation();
+    isMusicMuted = !isMusicMuted;
+    if(isMusicMuted) music.pause(); else music.play();
+    document.getElementById('musicBtn').innerText = isMusicMuted ? "🔇" : "🔊";
+}
+
+function createExplosion() {
+    for(let i=0; i<15; i++) particles.push({ x: bird.x, y: bird.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1.0, color: userData.skin });
+}
+
+window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+for(let i=0; i<6; i++) clouds.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height*0.5, s: 0.3 + Math.random()*0.5 });
+canvas.addEventListener('touchstart', triggerJump, { passive: false });
+canvas.addEventListener('mousedown', (e) => { if (e.button === 0) triggerJump(e); });
+window.addEventListener("keydown", (e) => { if(e.code === "Space") { e.preventDefault(); triggerJump(); } if(e.key === "z" || e.key === "Z") activateAutoClick(); });
 
 updateUI(); update();
 </script>
